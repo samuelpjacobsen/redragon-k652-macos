@@ -4,7 +4,7 @@ set -euo pipefail
 
 ROOT="${0:A:h:h}"
 APP_NAME="Teclado K652"
-BUNDLE_ID="local.samuel.teclado-k652"
+BUNDLE_ID="${BUNDLE_ID:-local.samuel.teclado-k652}"  # sobrescreva para assinar com outro identificador
 VERSION="1.0.0"
 APP="$ROOT/$APP_NAME.app"
 BUILD="$ROOT/.build"
