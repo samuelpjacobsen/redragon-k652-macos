@@ -15,21 +15,24 @@ struct PerKeyView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             ConnectionNotice()
-            HStack {
+            HStack(spacing: 12) {
                 Picker("Grupo", selection: $model.group) {
-                    ForEach(0..<LightingBlock.groupCount, id: \.self) { Text("Personalizado \($0 + 1)").tag($0) }
+                    ForEach(0..<LightingBlock.groupCount, id: \.self) { Text("\($0 + 1)").tag($0) }
                 }
                 .pickerStyle(.segmented)
-                .frame(maxWidth: 520)
+                .fixedSize()
+                .help("Os 5 grupos de cores por tecla guardados no teclado")
                 Spacer()
                 Toggle("Pré-visualizar ao vivo", isOn: $model.livePreview)
                     .toggleStyle(.switch)
+                    .fixedSize()
                     .disabled(model.connection != .connected || model.snapshot?.supportsLivePreview != true)
                     .help("Mostra as cores no teclado enquanto você pinta, sem gravar")
             }
 
             HStack(spacing: 10) {
                 ColorPicker("Pincel", selection: $brush, supportsOpacity: false)
+                    .fixedSize()
                     .onChange(of: brush) { eraser = false }
                 ForEach(swatches, id: \.self) { swatch in
                     Button {
@@ -41,12 +44,17 @@ struct PerKeyView: View {
                     }
                     .buttonStyle(.plain)
                 }
-                Toggle(isOn: $eraser) { Label("Apagar", systemImage: "eraser") }
+                Toggle(isOn: $eraser) { Label("Borracha", systemImage: "eraser") }
                     .toggleStyle(.button)
+                    .fixedSize()
                 Spacer()
+            }
+
+            HStack(spacing: 8) {
                 Button("Preencher tudo") { model.fillGroup(LEDColor(brush)) }
                 Button("Apagar tudo") { model.fillGroup(.black) }
                 Button("Padrão do grupo") { model.resetGroup() }
+                Spacer()
             }
 
             KeyboardCanvas(
