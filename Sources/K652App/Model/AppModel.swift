@@ -209,7 +209,7 @@ final class AppModel: ObservableObject {
     }
 
     func fillGroup(_ color: LEDColor) {
-        customGroups[group] = [LEDColor](repeating: color, count: K652Layout.ledCount)
+        customGroups = CustomColorMatrix.filling(group: group, with: color, base: customGroups)
         saveState()
     }
 

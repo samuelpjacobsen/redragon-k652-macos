@@ -35,3 +35,25 @@ import Testing
     #expect(Set(positions).count == K652Layout.keys.count)
     #expect(positions.allSatisfy { (0..<CustomColorMatrix.planeSize).contains($0) })
 }
+
+@Test func fillingAGroupPaintsEveryKeyAndKeepsTheOthers() {
+    let base = CustomColorMatrix.defaultGroups()
+    let white = LEDColor.white
+
+    let groups = CustomColorMatrix.filling(group: 4, with: white, base: base)
+    let data = CustomColorMatrix.encode(groups: groups)
+
+    #expect(groups[4].allSatisfy { $0 == white })
+    #expect(Array(groups[0..<4]) == Array(base[0..<4]))
+    for key in K652Layout.keys {
+        #expect(data[(3 * 4 + 1) * CustomColorMatrix.planeSize + key.customColorSlot] == 0xFF)
+    }
+}
+
+@Test func fillingAGroupOutOfRangeChangesNothing() {
+    let base = CustomColorMatrix.defaultGroups()
+
+    let groups = CustomColorMatrix.filling(group: 5, with: .white, base: base)
+
+    #expect(groups == base)
+}
