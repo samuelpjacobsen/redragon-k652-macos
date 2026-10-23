@@ -51,6 +51,10 @@ Os endereços são páginas de 256 bytes da flash.
 | `0x08` | `0xB8` (RgbTabAddr) | paleta de cada efeito | `FUN_00445af0` |
 | `0x09` | `0xBC` e `0xC0` (GameAddr) | cores por tecla, dois pedaços de 1024 bytes | `FUN_00445800` |
 | `0x05` | `0xDC`, `0xE0`, `0xE4`, `0xE8` | macros (o app não usa) | `FUN_00445bd0` |
+| `0x88` | `0xB8` | lê a paleta (visto no Azure, o driver não usa) | — |
+| `0x89` | `0xBC`, `0xC0` | lê as cores por tecla (visto no Azure, o driver não usa) | — |
+
+As leituras `0x88` e `0x89` não ecoam o endereço na resposta (`06 88 00 …`). Os dados seguem o mesmo layout da gravação, a partir do byte 8.
 
 PSD esperado do K652: `02 00 00 00 01 AB` (`Cfg.ini`, linha 35).
 
@@ -60,10 +64,11 @@ Montado em `FUN_0040d240` e sincronizado em `FUN_0040d3b0` (ApplySetting). O dri
 
 | Byte | Valor |
 |---|---|
-| 0 | zerado antes de gravar |
-| 12 | 1 quando o modo é Personalizado (índice 20 da interface, `GaoshouIndex=20`) |
+| 0 | o driver grava `OurCfg` (0 no Cfg do K652); o Azure devolve `01` |
+| 12 | 1 quando o modo é Personalizado (índice 20 da interface, `GaoshouIndex=20`; `LedModeSelectOffset=4` a partir do byte 8). No Azure, com 1 o teclado mostra as cores por tecla do grupo do byte 14, seja qual for o byte 13 |
 | 13 | modo de hardware: 0 desligado, 1–21 |
 | 14 | `0x20` + grupo personalizado (0–4) |
+| 16 | o driver não grava. No Azure estava `02` e virou `00` sem gravação nossa; voltar para `02` não mudou nada visível |
 | 28, 29 | `FF FF` |
 | 30 + 2k | cor do modo k (k = 0–21, modo de hardware k+1). Nibble baixo: índice da paleta 0–6, ou 7 para aleatório. Nibble alto: direção (0 ou 8), só nos modos com direção |
 | 31 + 2k | `(velocidade << 4) \| brilho`, os dois de 0 a 4 (`SpeedHW`/`LightHW=0,1,2,3,4`) |
@@ -118,7 +123,18 @@ Firmware `0x0104`, pelo cabo:
 - quadro ao vivo (report 8): 30 quadros aceitos;
 - **o teclado pode sair do USB e voltar cerca de 1 s depois de uma gravação de iluminação** (kernel: `terminateDevice … hardware connection lost`, seguido de `enumerated 0x258a/0049/0104`). A conexão antiga passa a responder `0x10000003` (MACH_SEND_INVALID_DEST). O transporte reabre e repete a operação, e o app reabre a conexão a cada aviso de reconexão. Não acontece sempre: gravar Fixo por cima de Fixo, trocando só a cor (13:09, slot 5 → 1), não reiniciou o USB (o `sessionID` da enumeração continuou o das 13:02). Por isso o app não percebe uma gravação feita por fora (`k652ctl`) e só a mostra quando é reaberto;
 - Fixo com o slot 1 da paleta padrão (`00 00 FF`) gravado e relido: byte 30 = `01`, byte 31 = `44`;
-- **não testado**: gravação da matriz de teclas, das cores por tecla (`0x09`) com a posição do campo 8 e o sentido da velocidade.
+- cores por tecla (`0x09`) pela posição do campo 8: o grupo inteiro em azul, vermelho e branco acendeu todas as teclas. Com as cores antigas, gravadas pelo LED, acenderam F4, 5, S, B, F9, PgUp, Pause, Del, `[` e Enter, exatamente as teclas que a posição do campo 8 prevê para aqueles bytes;
+- **não testado**: gravação da matriz de teclas e o sentido da velocidade.
+
+### Problema aberto: efeitos que apagam o teclado
+
+No Azure, Fixo azul (modo 1, slot 1, brilho 4, byte 12 = 0) deixou o teclado inteiro apagado, embora a releitura confirme os bytes e a paleta lida por `0x88` tenha `00 00 FF` no slot 1. O driver oficial grava os mesmos bytes nesse caso (`FUN_0040d240`, `FUN_00445af0`). O que já foi descartado:
+
+- o byte 12: com 1, o teclado mostra as cores por tecla, não o efeito;
+- o byte 16: voltar para `02`, como na fábrica, não acendeu;
+- o enquadramento da paleta: cabeçalho, 21 zeros e ordem das cores conferem com `FUN_00445af0` e `FUN_0040d3b0`.
+
+Falta saber se algum efeito acende (o Arco-íris, modo 3, não usa paleta) e se os efeitos trocados pelas teclas Fn do próprio teclado funcionam. Enquanto isso, o modo Personalizado é o caminho confirmado para cor estática.
 
 ## Segurança
 
