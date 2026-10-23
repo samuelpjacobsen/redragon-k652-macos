@@ -23,6 +23,7 @@ func usage() -> Never {
                                    troca o modo (0 desligado, 1 fixo... 21 personalizado);
                                    slot 0...6 escolhe a cor da paleta padrão (1 = azul)
       color <hw> RRGGBB            cor fixa no slot 0 da paleta do modo
+      fill RRGGBB [grupo]          todas as teclas numa cor, no modo Personalizado (grupo 1...5)
       live RRGGBB [segundos]       pinta tudo ao vivo pelo report 8 (não grava)
       --force                      grava mesmo sem confirmar o modelo
     """)
@@ -49,10 +50,8 @@ do {
     fail(error.localizedDescription)
 }
 
-/// Relê do teclado o que foi gravado. O Azure reinicia o USB depois de aplicar, então esta leitura
-/// também confere que o app reabre a conexão sozinho.
-/// O Azure some do USB cerca de 1 s depois de aplicar (log do kernel, 23/10/2026); a espera garante
-/// que a releitura passe pela reconexão.
+/// Espera antes de reler o que foi gravado. O Azure pode sumir do USB cerca de 1 s depois de aplicar
+/// (log do kernel, 23/10/2026); a espera garante que a releitura passe pela reconexão.
 let readbackDelay: TimeInterval = 2
 /// Comandos de leitura: o bit alto ligado (0x83 lê o que 0x03 grava, 0x84 o que 0x04 grava).
 let readOnlyCommands: ClosedRange<UInt8> = 0x81...0x8F
@@ -65,7 +64,8 @@ func printReadback() {
         let detail = block.settings(for: block.modeHW).map {
             "brilho \($0.brightness), velocidade \($0.speed), cor \($0.random ? "aleatória" : "slot \($0.colorIndex)")"
         } ?? ""
-        print("Gravado e relido: modo \(block.modeHW) (\(name)) \(detail)")
+        let group = LightingMode.mode(hw: block.modeHW)?.isCustom == true ? "grupo \(block.customGroup + 1)" : ""
+        print("Gravado e relido: modo \(block.modeHW) (\(name)) \(detail)\(group)")
     } catch {
         fail("gravei, mas não consegui reler: \(error.localizedDescription)")
     }
@@ -139,6 +139,16 @@ do {
         settings[hw]?.colorIndex = 0
         settings[hw]?.random = false
         try device.applyLighting(mode: mode, group: snapshot.lighting?.customGroup ?? 0, settings: settings, customGroups: nil)
+        printReadback()
+    case "fill":
+        guard args.count >= 2, let color = parseColor(args[1]) else { usage() }
+        let group = args.count >= 3 ? (Int(args[2]) ?? 0) - 1 : snapshot.lighting?.customGroup ?? 0
+        guard (0..<LightingBlock.groupCount).contains(group) else { usage() }
+        requireWritable()
+        // As cores por tecla não são legíveis: os outros grupos voltam ao padrão do driver.
+        let groups = CustomColorMatrix.filling(group: group, with: color, base: CustomColorMatrix.defaultGroups())
+        try device.applyLighting(mode: LightingMode.mode(hw: LightingMode.customHW)!, group: group,
+                                 settings: settingsFromKeyboard(), customGroups: groups)
         printReadback()
     case "live":
         guard args.count >= 2, let color = parseColor(args[1]) else { usage() }
